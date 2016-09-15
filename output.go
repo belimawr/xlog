@@ -271,6 +271,58 @@ func (o consoleOutput) Write(fields map[string]interface{}) error {
 	return err
 }
 
+type consoleOutputWithoutColours struct {
+	w io.Writer
+}
+
+// NewConsoleOutputWithoutColours returns a Output printing message in a coloured human readable form on the
+// stderr. If the stderr is not on a terminal, the Output prints the messages without colours.
+func NewConsoleOutputWithoutColours() Output {
+	return NewConsoleOutputW(os.Stderr, consoleOutputWithoutColours{w: os.Stderr})
+}
+
+func (o consoleOutputWithoutColours) Write(fields map[string]interface{}) error {
+	buf := bufPool.Get().(*bytes.Buffer)
+	defer func() {
+		buf.Reset()
+		bufPool.Put(buf)
+	}()
+	if ts, ok := fields[KeyTime].(time.Time); ok {
+		buf.Write([]byte(ts.Format("2006/01/02 15:04:05 ")))
+	}
+	if lvl, ok := fields[KeyLevel].(string); ok {
+		buf.Write([]byte(strings.ToUpper(lvl[0:4])))
+		buf.WriteByte(' ')
+	}
+	if msg, ok := fields[KeyMessage].(string); ok {
+		msg = strings.Replace(msg, "\n", "\\n", -1)
+		buf.Write([]byte(msg))
+	}
+	// Gather field keys
+	keys := []string{}
+	for k := range fields {
+		switch k {
+		case KeyLevel, KeyMessage, KeyTime:
+			continue
+		}
+		keys = append(keys, k)
+	}
+	// Sort fields by key names
+	sort.Strings(keys)
+	// Print fields using logfmt format
+	for _, k := range keys {
+		buf.WriteByte(' ')
+		buf.Write([]byte(k))
+		buf.WriteByte('=')
+		if err := writeValue(buf, fields[k]); err != nil {
+			return err
+		}
+	}
+	buf.WriteByte('\n')
+	_, err := o.w.Write(buf.Bytes())
+	return err
+}
+
 type logfmtOutput struct {
 	w io.Writer
 }
