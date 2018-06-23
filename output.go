@@ -205,6 +205,12 @@ type consoleOutput struct {
 
 var isTerminal = term.IsTerminal
 
+// NewConsoleOnlyOutput returns a Output that always prints messages in
+// a colored human readable form on os.Stderr
+func NewConsoleOnlyOutput() Output {
+	return consoleOutput{w: os.Stderr}
+}
+
 // NewConsoleOutput returns a Output printing message in a colored human readable form on the
 // stderr. If the stderr is not on a terminal, a LogfmtOutput is returned instead.
 func NewConsoleOutput() Output {
